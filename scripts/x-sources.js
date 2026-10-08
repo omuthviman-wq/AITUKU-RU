@@ -9,9 +9,10 @@ export async function searchX({ bearer, query, maxResults = 100 }) {
   const params = new URLSearchParams({
     query: query || DEFAULT_X_QUERY,
     max_results: String(Math.min(Math.max(maxResults, 10), 100)),
-    'tweet.fields': 'public_metrics,created_at,author_id,note_tweet',
-    expansions: 'author_id',
+    'tweet.fields': 'public_metrics,created_at,author_id,note_tweet,attachments',
+    expansions: 'author_id,attachments.media_keys',
     'user.fields': 'username,name',
+    'media.fields': 'type,url,preview_image_url',
   });
   const res = await fetch(`https://api.x.com/2/tweets/search/recent?${params}`, {
     headers: { Authorization: `Bearer ${bearer}` },
@@ -22,6 +23,7 @@ export async function searchX({ bearer, query, maxResults = 100 }) {
     throw new Error(msg);
   }
   const users = new Map((json.includes?.users || []).map((u) => [u.id, u]));
+  const media = new Map((json.includes?.media || []).map((m) => [m.media_key, m]));
   return (json.data || [])
     .map((t) => {
       const m = t.public_metrics || {};
@@ -37,6 +39,11 @@ export async function searchX({ bearer, query, maxResults = 100 }) {
         likes: m.like_count || 0,
         score: (m.like_count || 0) + 2 * (m.retweet_count || 0) + 3 * (m.bookmark_count || 0),
         postedAt: t.created_at,
+        // 生成サンプル(添付画像。動画/GIFはサムネイル)
+        images: (t.attachments?.media_keys || [])
+          .map((k) => media.get(k))
+          .map((m) => m?.url || m?.preview_image_url)
+          .filter(Boolean),
         tags: [],
       };
     })

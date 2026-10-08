@@ -58,3 +58,9 @@ button:disabled { opacity: .5; cursor: wait; }
 label.button { display: inline-block; margin: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; }
 code { font-size: 12px; }
 .row.spread h2 { flex: 1; min-width: 0; }
+a.button { display: inline-block; padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--accent); text-decoration: none; }
+.samples { margin-top: 8px; }
+.thumbs { display: flex; gap: 6px; overflow-x: auto; }
+.thumbs img { height: 140px; width: auto; border-radius: 8px; display: block; }
+.embed:empty { display: none; }
+.embed { margin-top: 8px; }

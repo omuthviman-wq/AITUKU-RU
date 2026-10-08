@@ -1,7 +1,7 @@
 import { SEED_PROMPTS } from './js/seeds.js';
 import { composeSimple, composeWithAI } from './js/compose.js';
 import { generateImage } from './js/generate.js';
-import { fetchTweet } from './js/tweet.js';
+import { fetchTweet, tweetIdOf, embedTweet } from './js/tweet.js';
 import { loadStore, saveStore, exportStore, importStore } from './js/store.js';
 
 const $ = (s) => document.querySelector(s);
@@ -166,6 +166,43 @@ $('#charForm').onsubmit = (ev) => {
   });
 };
 
+// ---------- 生成サンプル & ツイートへのリンク ----------
+function sampleBlock(p) {
+  const id = tweetIdOf(p);
+  if (!p.images?.length && !id && !p.url) return null;
+  const box = el('div', { class: 'samples' });
+  if (p.images?.length) {
+    box.append(
+      el('div', { class: 'thumbs' },
+        ...p.images.map((src) =>
+          el('a', { href: src, target: '_blank', rel: 'noopener' }, el('img', { src, alt: '生成サンプル', loading: 'lazy' })),
+        ),
+      ),
+    );
+  }
+  const embed = el('div', { class: 'embed' });
+  const row = el('div', { class: 'row' });
+  if (id) {
+    const btn = el('button', {
+      onclick: () => {
+        if (embed.childElementCount) {
+          embed.replaceChildren();
+          btn.textContent = p.images?.length ? 'ツイートを表示' : 'サンプルを見る(ツイート表示)';
+          return;
+        }
+        busy(btn, async () => {
+          await embedTweet(id, embed);
+          btn.textContent = '閉じる';
+        });
+      },
+    }, p.images?.length ? 'ツイートを表示' : 'サンプルを見る(ツイート表示)');
+    row.append(btn);
+  }
+  if (p.url) row.append(el('a', { class: 'button', href: p.url, target: '_blank', rel: 'noopener' }, 'Xで開く ↗'));
+  box.append(row, embed);
+  return box;
+}
+
 // ---------- ② プロンプト一覧 ----------
 const SOURCE_LABEL = { x: 'X', manual: '手動', builtin: '内蔵' };
 
@@ -211,9 +248,9 @@ function renderPrompts() {
           p.author ? el('span', {}, p.author) : null,
           p.likes ? el('span', {}, `♥ ${p.likes}`) : null,
           ...(p.tags || []).map((t) => el('span', {}, `#${t}`)),
-          p.url ? el('a', { href: p.url, target: '_blank', rel: 'noopener' }, '元ツイート') : null,
         ),
         el('div', { class: 'text', onclick: () => card.classList.toggle('open') }, p.text),
+        sampleBlock(p),
         el('div', { class: 'row' },
           el('button', { class: 'primary', onclick: () => pickScene(p) }, 'このキャラで作る'),
           el('button', {
@@ -277,7 +314,7 @@ function pickScene(p) {
     return showTab('chars');
   }
   state.scene = p;
-  $('#makeScene').replaceChildren(el('strong', {}, p.title), el('div', { class: 'muted' }, p.text));
+  $('#makeScene').replaceChildren(el('strong', {}, p.title), el('div', { class: 'muted' }, p.text), sampleBlock(p) || '');
   showTab('make');
   compose(false);
 }

@@ -21,7 +21,7 @@ const byId = new Map(existing.map((p) => [p.externalId, p]));
 let added = 0;
 for (const f of found) {
   const old = byId.get(f.externalId);
-  if (old) Object.assign(old, { likes: f.likes, score: f.score });
+  if (old) Object.assign(old, { likes: f.likes, score: f.score, images: f.images });
   else {
     byId.set(f.externalId, { id: `x-${f.externalId}`, createdAt: new Date().toISOString(), ...f });
     added++;

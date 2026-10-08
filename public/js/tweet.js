@@ -31,3 +31,31 @@ export function fetchTweet(url) {
     document.head.append(script);
   });
 }
+
+export function tweetIdOf(p) {
+  return p.externalId || p.url?.match(/(?:twitter\.com|x\.com)\/[^/?#]+\/status\/(\d+)/)?.[1] || '';
+}
+
+// 公式の埋め込みでツイートを表示(添付の生成サンプル画像も見える)
+let widgets;
+function loadWidgets() {
+  widgets ??= new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://platform.twitter.com/widgets.js';
+    s.async = true;
+    s.onload = () => window.twttr.ready(resolve);
+    s.onerror = () => {
+      widgets = null;
+      reject(new Error('ツイートの埋め込みを読み込めませんでした'));
+    };
+    document.head.append(s);
+  });
+  return widgets;
+}
+
+export async function embedTweet(id, container) {
+  const twttr = await loadWidgets();
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const el = await twttr.widgets.createTweet(id, container, { theme: dark ? 'dark' : 'light', lang: 'ja', conversation: 'none', dnt: true });
+  if (!el) throw new Error('ツイートを表示できませんでした(削除済みか鍵垢かも)');
+}
