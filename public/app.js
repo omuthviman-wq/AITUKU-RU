@@ -1,9 +1,9 @@
-import { SEED_PROMPTS } from './js/seeds.js';
-import { composeSimple, composeWithAI, composeWithGemini } from './js/compose.js';
-import { generateImage } from './js/generate.js';
-import { fetchTweet, tweetIdOf, embedTweet } from './js/tweet.js';
-import { fetchTweetDetail, TWEET_URL_RE } from './js/tweet-api.js';
-import { loadStore, saveStore, exportStore, importStore } from './js/store.js';
+import { SEED_PROMPTS } from './js/seeds.js?v=dev';
+import { composeSimple, composeWithAI, composeWithGemini } from './js/compose.js?v=dev';
+import { generateImage } from './js/generate.js?v=dev';
+import { fetchTweet, tweetIdOf, embedTweet } from './js/tweet.js?v=dev';
+import { fetchTweetDetail, TWEET_URL_RE } from './js/tweet-api.js?v=dev';
+import { loadStore, saveStore, exportStore, importStore } from './js/store.js?v=dev';
 
 const $ = (s) => document.querySelector(s);
 
@@ -538,6 +538,7 @@ $('#importFile').onchange = async (ev) => {
 };
 
 // ---------- init ----------
+$('#version').textContent = new URL(import.meta.url).searchParams.get('v') || 'dev';
 $('#genCard').append(el('p', { class: 'muted', id: 'genNote' }, '設定タブで OpenAI APIキーを入れると、ここで直接生成できます。今はコピーしてChatGPTに貼ってください。'));
 renderKeyState();
 renderChars();

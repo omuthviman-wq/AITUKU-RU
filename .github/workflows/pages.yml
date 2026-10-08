@@ -40,6 +40,12 @@ jobs:
           git commit -m "Xから収集したプロンプトを更新"
           git push
 
+      # スマホのキャッシュで古いJSが残らないよう、読み込みURLにバージョンを付ける
+      - name: キャッシュ対策
+        run: |
+          v="$(git rev-parse --short HEAD)"
+          sed -i "s/?v=dev/?v=$v/g" public/index.html public/app.js public/js/*.js
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

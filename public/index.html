@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=dev">
 </head>
 <body>
   <header>
@@ -144,6 +144,7 @@
         </div>
       </form>
       <p class="muted">キーはこのスマホのブラウザ内だけに保存され、Google / OpenAI 以外には送られません。</p>
+      <p class="muted">バージョン: <span id="version"></span>(更新が反映されない時はページを再読み込み)</p>
       <div class="card">
         <h2>Xからの自動収集</h2>
         <p class="muted">GitHub Actions が毎朝6時ごろに X を検索して一覧を更新します。「Xから収集」ボタンを押すと今すぐ実行する画面(GitHub)が開くので、「Run workflow」を押してください。数分後に「最新を読み込む」で反映されます。<br>使うには GitHub の Settings → Secrets and variables → Actions に <code>X_BEARER_TOKEN</code> を登録してください(X API の有料プランが必要)。</p>
@@ -160,6 +161,6 @@
   </main>
 
   <div id="toast" hidden></div>
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=dev"></script>
 </body>
 </html>

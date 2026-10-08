@@ -1,4 +1,4 @@
-import { fetchTweetDetail, parseTweetUrl, makeTitle } from './tweet-api.js';
+import { fetchTweetDetail, parseTweetUrl, makeTitle } from './tweet-api.js?v=dev';
 
 // ツイートURL → 一覧の1項目。まず FxTwitter/vxTwitter(画像・いいね数つき)、
 // ダメなら publish.twitter.com の oEmbed(本文のみ)を JSONP で。
