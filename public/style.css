@@ -64,3 +64,10 @@ a.button { display: inline-block; padding: 8px 14px; border: 1px solid var(--lin
 .thumbs img { height: 140px; width: auto; border-radius: 8px; display: block; }
 .embed:empty { display: none; }
 .embed { margin-top: 8px; }
+.refs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ref { position: relative; }
+.ref img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; }
+.ref button { position: absolute; top: 2px; right: 2px; padding: 0 7px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; border: none; }
+.char .thumbs img { height: 110px; width: auto; aspect-ratio: auto; margin: 0; }
+.thumbs a { flex: none; }
+#refImages img { height: 80px; border-radius: 6px; }

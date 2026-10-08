@@ -4,7 +4,7 @@ export function characterBlock(ch) {
   const lines = [`名前: ${ch.name}`];
   if (ch.appearance) lines.push(`外見: ${ch.appearance}`);
   if (ch.extra) lines.push(`補足: ${ch.extra}`);
-  if (ch.image) lines.push('添付の参考画像のキャラクターと同一人物として、顔立ち・髪型・髪色・体型を一致させてください。');
+  if (ch.images?.length) lines.push(`添付の参考画像${ch.images.length > 1 ? `(${ch.images.length}枚、すべて同じ人物)` : ''}のキャラクターと同一人物として、顔立ち・髪型・髪色・体型を一致させてください。`);
   lines.push('※登場人物は成人(20代)として描写してください。');
   return lines.join('\n');
 }

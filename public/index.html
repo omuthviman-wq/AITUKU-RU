@@ -41,9 +41,11 @@
         <label>補足(性格・雰囲気・画風など)
           <textarea name="extra" rows="3" placeholder="例: おっとりしたお姉さん系、実写風"></textarea>
         </label>
-        <label>参考画像(任意・ワンボタン生成で顔を寄せるのに使う)
-          <input type="file" name="image" accept="image/*">
+        <label>参考画像(任意・複数枚OK。顔や体型を寄せるのに使う)
+          <input type="file" name="image" accept="image/*" multiple>
         </label>
+        <div id="charImages" class="refs"></div>
+        <p id="charImageCount" class="muted">0 / 8枚</p>
         <label class="check"><input type="checkbox" name="adult"> このキャラは18歳以上(成人)です</label>
         <div class="row">
           <button type="submit" class="primary">保存</button>
@@ -70,8 +72,10 @@
       <details class="card">
         <summary>ツイートURL / プロンプトを手動で追加</summary>
         <form id="addForm">
-          <label>ツイートURL<input name="url" placeholder="https://x.com/xxx/status/123..."></label>
-          <label>本文(URLだけで取れない時や、画像内のプロンプトを書き写す時)
+          <label>ツイートURL(複数まとめて貼ってOK。本文とサンプル画像を自動で取ってくる)
+            <textarea name="url" rows="3" placeholder="https://x.com/xxx/status/123...&#10;https://x.com/yyy/status/456..."></textarea>
+          </label>
+          <label>本文(URLで取れない時や、プロンプトが画像・リプ欄にある時に貼る)
             <textarea name="text" rows="4"></textarea>
           </label>
           <label>タイトル(任意)<input name="title"></label>
@@ -98,6 +102,7 @@
           <button id="openChatGPT">コピーしてChatGPTを開く</button>
         </div>
         <p id="refNote" class="muted" hidden>※参考画像つきのキャラです。ChatGPTに投げる時は参考画像も一緒に添付してください。</p>
+        <div id="refImages" class="thumbs"></div>
       </div>
       <div class="card" id="genCard">
         <h2>ワンボタン生成(OpenAI API)</h2>

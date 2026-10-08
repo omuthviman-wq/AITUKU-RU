@@ -1,4 +1,5 @@
 // X API v2 recent search でプロンプトっぽいツイートを集める(GitHub Actions から実行)。
+import { cleanTweetText, makeTitle } from '../public/js/tweet-api.js';
 
 export const DEFAULT_X_QUERY =
   '(ChatGPT OR GPT-4o OR gpt-image OR GPT画像) (プロンプト OR prompt) ' +
@@ -54,15 +55,3 @@ export async function searchX({ bearer, query, maxResults = 100 }) {
 const netError = (name) => (e) => {
   throw new Error(`${name} に接続できませんでした (${e.cause?.code || e.message})`);
 };
-
-function cleanTweetText(text) {
-  return (text || '')
-    .replace(/https?:\/\/t\.co\/\S+/g, '')
-    .replace(/pic\.twitter\.com\/\S+/g, '')
-    .trim();
-}
-
-export function makeTitle(text) {
-  const first = text.split('\n').map((s) => s.trim()).find(Boolean) || '無題';
-  return first.length > 30 ? `${first.slice(0, 30)}…` : first;
-}

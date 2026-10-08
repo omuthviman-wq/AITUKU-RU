@@ -2,13 +2,16 @@ import { SEED_PROMPTS } from './js/seeds.js';
 import { composeSimple, composeWithAI } from './js/compose.js';
 import { generateImage } from './js/generate.js';
 import { fetchTweet, tweetIdOf, embedTweet } from './js/tweet.js';
+import { fetchTweetDetail, TWEET_URL_RE } from './js/tweet-api.js';
 import { loadStore, saveStore, exportStore, importStore } from './js/store.js';
 
 const $ = (s) => document.querySelector(s);
 
-let store = loadStore();
-const state = { xPrompts: [], scene: null };
+let store = await loadStore();
+const state = { xPrompts: [], scene: null, formImages: [], enriched: new Map(), enriching: new Set() };
+const MAX_REF_IMAGES = 8;
 const save = () => saveStore(store);
+const saveQuiet = () => save().catch((e) => toast(e.message));
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 // GitHub Pages の URL(user.github.io/repo/)から元リポジトリを割り出す
@@ -68,7 +71,7 @@ function renderChars() {
   $('#charList').replaceChildren(
     ...store.chars.map((c) =>
       el('div', { class: 'card char' },
-        c.image ? el('img', { src: c.image, alt: c.name }) : null,
+        c.images.length ? el('div', { class: 'thumbs' }, ...c.images.map((src) => el('img', { src, alt: c.name }))) : null,
         el('h2', {}, c.name),
         c.appearance ? el('p', {}, c.appearance) : null,
         c.extra ? el('p', { class: 'muted' }, c.extra) : null,
@@ -78,7 +81,7 @@ function renderChars() {
             onclick: () => {
               if (!confirm(`${c.name} を削除しますか?`)) return;
               store.chars = store.chars.filter((x) => x.id !== c.id);
-              save();
+              saveQuiet();
               renderChars();
             },
           }, '削除'),
@@ -89,7 +92,7 @@ function renderChars() {
 }
 $('#currentChar').onchange = (ev) => {
   store.currentChar = ev.target.value;
-  save();
+  saveQuiet();
   if (state.scene) compose(false);
 };
 
@@ -100,6 +103,8 @@ function editChar(c) {
   f.appearance.value = c.appearance;
   f.extra.value = c.extra;
   f.adult.checked = c.adult;
+  state.formImages = [...c.images];
+  renderFormImages();
   $('#charFormTitle').textContent = `${c.name} を編集`;
   $('#charCancel').hidden = false;
   f.scrollIntoView({ behavior: 'smooth' });
@@ -109,6 +114,8 @@ function resetCharForm() {
   const f = $('#charForm');
   f.reset();
   f.id.value = '';
+  state.formImages = [];
+  renderFormImages();
   $('#charFormTitle').textContent = 'キャラを登録';
   $('#charCancel').hidden = true;
 }
@@ -135,6 +142,38 @@ function shrinkImage(file) {
   });
 }
 
+function renderFormImages() {
+  $('#charImages').replaceChildren(
+    ...state.formImages.map((src, i) =>
+      el('div', { class: 'ref' },
+        el('img', { src, alt: `参考画像${i + 1}` }),
+        el('button', {
+          type: 'button',
+          title: '外す',
+          onclick: () => {
+            state.formImages.splice(i, 1);
+            renderFormImages();
+          },
+        }, '×'),
+      ),
+    ),
+  );
+  $('#charImageCount').textContent = `${state.formImages.length} / ${MAX_REF_IMAGES}枚`;
+}
+
+$('#charForm').image.onchange = async (ev) => {
+  const files = [...ev.target.files];
+  ev.target.value = '';
+  const room = MAX_REF_IMAGES - state.formImages.length;
+  if (files.length > room) toast(`参考画像は${MAX_REF_IMAGES}枚までです`);
+  try {
+    for (const file of files.slice(0, Math.max(room, 0))) state.formImages.push(await shrinkImage(file));
+  } catch (e) {
+    toast(e.message);
+  }
+  renderFormImages();
+};
+
 $('#charForm').onsubmit = (ev) => {
   ev.preventDefault();
   const f = ev.target;
@@ -149,13 +188,13 @@ $('#charForm').onsubmit = (ev) => {
       appearance: f.appearance.value.trim(),
       extra: f.extra.value.trim(),
       adult: true,
-      image: f.image.files[0] ? await shrinkImage(f.image.files[0]) : old?.image || '',
+      images: [...state.formImages],
     };
     const prev = store.chars;
     store.chars = old ? prev.map((c) => (c.id === ch.id ? ch : c)) : [...prev, ch];
     store.currentChar = ch.id;
     try {
-      save();
+      await save();
     } catch (e) {
       store.chars = prev;
       throw e;
@@ -167,10 +206,35 @@ $('#charForm').onsubmit = (ev) => {
 };
 
 // ---------- 生成サンプル & ツイートへのリンク ----------
+// サンプル画像がまだ無いツイートは、表示した時に裏で取ってくる
+async function enrich(p, box) {
+  const id = tweetIdOf(p);
+  state.enriching.add(id);
+  try {
+    const d = await fetchTweetDetail(p.url || `https://x.com/i/status/${id}`);
+    const patch = { images: d.images, likes: d.likes || p.likes, score: d.score || p.score, author: d.author, url: d.url };
+    if (!p.text && d.text) Object.assign(patch, { text: d.text, title: d.title });
+    state.enriched.set(id, patch);
+    const mine = store.prompts.find((x) => x.id === p.id);
+    if (mine) {
+      Object.assign(mine, patch);
+      saveQuiet();
+    }
+    if (box.isConnected) box.replaceWith(sampleBlock({ ...p, ...patch }));
+  } catch {
+    state.enriched.set(id, { images: [] });
+    box.querySelector('.loading')?.remove();
+  }
+}
+
 function sampleBlock(p) {
   const id = tweetIdOf(p);
   if (!p.images?.length && !id && !p.url) return null;
   const box = el('div', { class: 'samples' });
+  if (id && !p.images?.length && !state.enriched.has(id)) {
+    box.append(el('p', { class: 'muted loading' }, 'サンプル画像を読み込み中…'));
+    if (!state.enriching.has(id)) enrich(p, box);
+  }
   if (p.images?.length) {
     box.append(
       el('div', { class: 'thumbs' },
@@ -212,7 +276,7 @@ function allPrompts() {
   const favs = new Set(store.favs);
   return [...store.prompts, ...state.xPrompts, ...seeds]
     .filter((p) => !hidden.has(p.id))
-    .map((p) => ({ ...p, fav: favs.has(p.id) }))
+    .map((p) => ({ ...p, ...state.enriched.get(tweetIdOf(p)), fav: favs.has(p.id) }))
     .sort((a, b) => b.fav - a.fav || (b.score || 0) - (a.score || 0));
 }
 
@@ -238,7 +302,7 @@ function renderPrompts() {
             title: 'お気に入り',
             onclick: () => {
               store.favs = p.fav ? store.favs.filter((id) => id !== p.id) : [...store.favs, p.id];
-              save();
+              saveQuiet();
               renderPrompts();
             },
           }, p.fav ? '★' : '☆'),
@@ -258,7 +322,7 @@ function renderPrompts() {
               if (!confirm('この項目を一覧から消しますか?')) return;
               if (p.source === 'manual') store.prompts = store.prompts.filter((x) => x.id !== p.id);
               else store.hidden = [...store.hidden, p.id];
-              save();
+              saveQuiet();
               renderPrompts();
             },
           }, '削除'),
@@ -287,23 +351,38 @@ $('#addForm').onsubmit = (ev) => {
   ev.preventDefault();
   const f = ev.target;
   busy(f.querySelector('button'), async () => {
-    const url = f.url.value.trim();
-    let text = f.text.value.trim();
-    let extra = { url };
-    if (url && !text) {
-      const t = await fetchTweet(url);
-      if (allPrompts().some((p) => p.externalId === t.externalId)) throw new Error('そのツイートは追加済みです');
-      text = t.text;
-      extra = t;
+    const urls = [...new Set([...f.url.value.matchAll(new RegExp(TWEET_URL_RE, 'g'))].map((m) => `https://x.com/${m[1]}/status/${m[2]}`))];
+    const text = f.text.value.trim();
+    const known = new Set(allPrompts().map((p) => tweetIdOf(p)).filter(Boolean));
+    const items = [];
+    if (urls.length > 1 || (urls.length === 1 && !text)) {
+      // URLだけ → ツイートから本文・サンプル画像を取ってくる(複数まとめてOK)
+      let failed = 0;
+      for (const url of urls) {
+        if (known.has(url.match(TWEET_URL_RE)[2])) continue;
+        try {
+          items.push(await fetchTweet(url));
+        } catch {
+          failed++;
+        }
+      }
+      if (!items.length) throw new Error(failed ? 'ツイートを取得できませんでした。本文を直接貼り付けてください。' : '全部追加済みです');
+      if (failed) toast(`${failed}件は取得できませんでした`);
+    } else {
+      if (!text) throw new Error('本文かURLを入力してください');
+      const first = text.split('\n').map((x) => x.trim()).find(Boolean);
+      items.push({ url: urls[0] || '', externalId: urls[0]?.match(TWEET_URL_RE)[2], text, title: first.length > 30 ? `${first.slice(0, 30)}…` : first });
     }
-    if (!text) throw new Error('本文かURLを入力してください');
-    const first = text.split('\n').map((s) => s.trim()).find(Boolean);
-    const title = f.title.value.trim() || (first.length > 30 ? `${first.slice(0, 30)}…` : first);
-    store.prompts = [{ id: uid(), source: 'manual', score: 0, likes: 0, tags: [], ...extra, text, title }, ...store.prompts];
-    save();
+    const title = f.title.value.trim();
+    store.prompts = [
+      ...items.map((t) => ({ id: uid(), score: 0, likes: 0, tags: [], images: [], ...t, ...(title && items.length === 1 ? { title } : {}), source: 'manual' })),
+      ...store.prompts,
+    ];
+    await save();
     f.reset();
+    $('#sourceFilter').value = '';
     renderPrompts();
-    toast('追加しました');
+    toast(`${items.length}件追加しました`);
   });
 };
 
@@ -314,6 +393,7 @@ function pickScene(p) {
     return showTab('chars');
   }
   state.scene = p;
+  if (!p.text.trim()) toast('このツイートは本文にプロンプトがありません。画像やリプ欄のプロンプトを下の欄に書き足してください');
   $('#makeScene').replaceChildren(el('strong', {}, p.title), el('div', { class: 'muted' }, p.text), sampleBlock(p) || '');
   showTab('make');
   compose(false);
@@ -322,7 +402,8 @@ function pickScene(p) {
 async function compose(useAI) {
   const ch = currentChar();
   if (!state.scene || !ch) return;
-  $('#refNote').hidden = !ch.image;
+  $('#refNote').hidden = !ch.images.length;
+  $('#refImages').replaceChildren(...ch.images.map((src) => el('img', { src, alt: '参考画像' })));
   $('#finalPrompt').value = useAI ? await composeWithAI(state.scene, ch, { apiKey: store.openaiKey }) : composeSimple(state.scene, ch);
 }
 
@@ -364,7 +445,7 @@ $('#generate').onclick = (ev) =>
       prompt,
       size: $('#size').value,
       quality: $('#quality').value,
-      refImage: $('#useRef').checked ? ch?.image : '',
+      refImages: $('#useRef').checked ? ch?.images || [] : [],
     });
     $('#results').prepend(el('div', { class: 'card' }, el('img', { src, alt: '生成結果' }), el('p', { class: 'muted' }, '長押しで保存')));
     toast('できました');
@@ -376,7 +457,7 @@ $('#keyForm').onsubmit = (ev) => {
   const key = ev.target.key.value.trim();
   if (key) {
     store.openaiKey = key;
-    save();
+    saveQuiet();
   }
   ev.target.reset();
   renderKeyState();
@@ -384,7 +465,7 @@ $('#keyForm').onsubmit = (ev) => {
 };
 $('#keyClear').onclick = () => {
   store.openaiKey = '';
-  save();
+  saveQuiet();
   renderKeyState();
   toast('削除しました');
 };
@@ -405,7 +486,7 @@ $('#importFile').onchange = async (ev) => {
   if (!file) return;
   try {
     store = importStore(store, await file.text());
-    save();
+    saveQuiet();
     renderChars();
     renderPrompts();
     toast('復元しました');

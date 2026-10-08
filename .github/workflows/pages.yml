@@ -26,14 +26,12 @@ jobs:
           node-version: 22
 
       - name: Xからプロンプト収集
-        if: github.event_name != 'push'
         env:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           X_QUERY: ${{ vars.X_QUERY }}
         run: node scripts/collect-x.mjs
 
       - name: 収集結果をコミット
-        if: github.event_name != 'push'
         run: |
           git add public/data
           if git diff --cached --quiet; then exit 0; fi
