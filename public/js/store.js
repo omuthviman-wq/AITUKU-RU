@@ -3,7 +3,7 @@
 const DB = 'aituku-ru';
 const KEY = 'aituku-ru:v1'; // 旧バージョン(localStorage)のキー
 
-const empty = () => ({ chars: [], prompts: [], favs: [], hidden: [], currentChar: '', openaiKey: '' });
+const empty = () => ({ chars: [], prompts: [], favs: [], hidden: [], edits: {}, currentChar: '', openaiKey: '' });
 
 function openDb() {
   return new Promise((resolve, reject) => {

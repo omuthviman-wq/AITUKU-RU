@@ -276,7 +276,7 @@ function allPrompts() {
   const favs = new Set(store.favs);
   return [...store.prompts, ...state.xPrompts, ...seeds]
     .filter((p) => !hidden.has(p.id))
-    .map((p) => ({ ...p, ...state.enriched.get(tweetIdOf(p)), fav: favs.has(p.id) }))
+    .map((p) => ({ ...p, ...state.enriched.get(tweetIdOf(p)), ...(store.edits[p.id] != null ? { text: store.edits[p.id], edited: true } : {}), fav: favs.has(p.id) }))
     .sort((a, b) => b.fav - a.fav || (b.score || 0) - (a.score || 0));
 }
 
@@ -309,6 +309,8 @@ function renderPrompts() {
         ),
         el('div', { class: 'meta' },
           el('span', { class: 'badge' }, SOURCE_LABEL[p.source] || p.source),
+          p.edited ? el('span', { class: 'badge' }, '編集済み') : null,
+          p.curated ? el('span', { class: 'badge' }, 'おすすめ') : null,
           p.author ? el('span', {}, p.author) : null,
           p.likes ? el('span', {}, `♥ ${p.likes}`) : null,
           ...(p.tags || []).map((t) => el('span', {}, `#${t}`)),
@@ -317,6 +319,7 @@ function renderPrompts() {
         sampleBlock(p),
         el('div', { class: 'row' },
           el('button', { class: 'primary', onclick: () => pickScene(p) }, 'このキャラで作る'),
+          el('button', { onclick: () => editPromptText(p, card) }, '本文を編集'),
           el('button', {
             onclick: () => {
               if (!confirm('この項目を一覧から消しますか?')) return;
@@ -333,6 +336,33 @@ function renderPrompts() {
   );
   if (!list.length) $('#promptList').append(el('p', { class: 'muted' }, '該当するプロンプトがありません'));
 }
+// リプ欄にあるプロンプト全文などを貼って保存できるように
+function editPromptText(p, card) {
+  if (card.querySelector('.edit')) return;
+  const ta = el('textarea', { rows: '8' });
+  ta.value = p.text;
+  const box = el('div', { class: 'edit' },
+    el('p', { class: 'muted' }, 'リプ欄や画像にあるプロンプト全文をここに貼って保存してください'),
+    ta,
+    el('div', { class: 'row' },
+      el('button', {
+        class: 'primary',
+        onclick: async () => {
+          const mine = store.prompts.find((x) => x.id === p.id);
+          if (mine) mine.text = ta.value.trim();
+          else store.edits[p.id] = ta.value.trim();
+          await saveQuiet();
+          renderPrompts();
+          toast('保存しました');
+        },
+      }, '保存'),
+      el('button', { onclick: () => box.remove() }, 'キャンセル'),
+    ),
+  );
+  card.querySelector('.text').after(box);
+  ta.focus();
+}
+
 $('#search').oninput = renderPrompts;
 $('#sourceFilter').onchange = renderPrompts;
 
