@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AITUKU-RU</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>AITUKU-RU</h1>
+    <label class="current">キャラ:
+      <select id="currentChar"></select>
+    </label>
+  </header>
+
+  <nav>
+    <button data-tab="chars">① キャラ</button>
+    <button data-tab="prompts" class="active">② プロンプト一覧</button>
+    <button data-tab="make">③ 作る</button>
+  </nav>
+
+  <main>
+    <!-- ① キャラ -->
+    <section id="tab-chars" hidden>
+      <form id="charForm" class="card">
+        <h2 id="charFormTitle">キャラを登録</h2>
+        <input type="hidden" name="id">
+        <label>名前<input name="name" required placeholder="例: ミナ"></label>
+        <label>見た目・キャラプロンプト
+          <textarea name="appearance" rows="5" placeholder="例: 25歳の日本人女性、黒髪ロングのストレート、ぱっつん前髪、たれ目、泣きぼくろ、色白、スタイル抜群"></textarea>
+        </label>
+        <label>補足(性格・雰囲気・画風など)
+          <textarea name="extra" rows="3" placeholder="例: おっとりしたお姉さん系、実写風"></textarea>
+        </label>
+        <label>参考画像(任意・ワンボタン生成で顔を寄せるのに使う)
+          <input type="file" name="image" accept="image/*">
+        </label>
+        <label class="check"><input type="checkbox" name="adult"> このキャラは18歳以上(成人)です</label>
+        <div class="row">
+          <button type="submit" class="primary">保存</button>
+          <button type="button" id="charCancel" hidden>キャンセル</button>
+        </div>
+      </form>
+      <div id="charList" class="grid"></div>
+    </section>
+
+    <!-- ② プロンプト一覧 -->
+    <section id="tab-prompts">
+      <div class="card toolbar">
+        <button id="fetchX" class="primary">Xから収集</button>
+        <input id="search" placeholder="絞り込み(水着、メイド…)">
+        <select id="sourceFilter">
+          <option value="">すべて</option>
+          <option value="fav">★お気に入り</option>
+          <option value="x">X</option>
+          <option value="manual">手動</option>
+          <option value="builtin">内蔵</option>
+        </select>
+      </div>
+      <details class="card">
+        <summary>ツイートURL / プロンプトを手動で追加</summary>
+        <form id="addForm">
+          <label>ツイートURL<input name="url" placeholder="https://x.com/xxx/status/123..."></label>
+          <label>本文(URLだけで取れない時や、画像内のプロンプトを書き写す時)
+            <textarea name="text" rows="4"></textarea>
+          </label>
+          <label>タイトル(任意)<input name="title"></label>
+          <button type="submit">追加</button>
+        </form>
+      </details>
+      <div id="promptList"></div>
+    </section>
+
+    <!-- ③ 作る -->
+    <section id="tab-make" hidden>
+      <div class="card">
+        <h2>シーン</h2>
+        <div id="makeScene" class="muted">②の一覧から「このキャラで作る」を押してください</div>
+      </div>
+      <div class="card">
+        <div class="row spread">
+          <h2>ChatGPTに投げるプロンプト</h2>
+          <button id="aiCompose" title="OpenAI APIでシーンとキャラを自然に合成し直す">AIで自然に合成</button>
+        </div>
+        <textarea id="finalPrompt" rows="14"></textarea>
+        <div class="row">
+          <button id="copyBtn" class="primary">コピー</button>
+          <button id="openChatGPT">コピーしてChatGPTを開く</button>
+        </div>
+        <p id="refNote" class="muted" hidden>※参考画像つきのキャラです。ChatGPTに投げる時は参考画像も一緒に添付してください。</p>
+      </div>
+      <div class="card" id="genCard">
+        <h2>ワンボタン生成(OpenAI API)</h2>
+        <div class="row">
+          <select id="size">
+            <option value="1024x1536">縦長</option>
+            <option value="1024x1024">正方形</option>
+            <option value="1536x1024">横長</option>
+          </select>
+          <select id="quality">
+            <option value="low">低画質(安い)</option>
+            <option value="medium" selected>中画質</option>
+            <option value="high">高画質</option>
+          </select>
+          <label class="check"><input type="checkbox" id="useRef" checked> 参考画像を使う</label>
+          <button id="generate" class="primary">生成</button>
+        </div>
+        <div id="results" class="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

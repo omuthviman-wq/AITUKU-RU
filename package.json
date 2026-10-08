@@ -1,0 +1,13 @@
+{
+  "name": "aituku-ru",
+  "version": "1.0.0",
+  "description": "ChatGPT画像生成用プロンプト収集 & キャラ合成ツール",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
