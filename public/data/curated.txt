@@ -1,0 +1,5 @@
+# 集めたいツイートのURLを1行ずつ。GitHub Actions が本文・サンプル画像・いいね数を取ってきて一覧に入れる。
+https://x.com/94vanai/status/2103316879381287239
+https://x.com/bobbizyo/status/2101257551455342938
+https://x.com/prompt_lab_ai/status/2099080818425802828
+https://x.com/nobishirooooo/status/2072168102297825612
