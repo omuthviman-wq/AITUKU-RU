@@ -1,5 +1,5 @@
 import { SEED_PROMPTS } from './js/seeds.js';
-import { composeSimple, composeWithAI } from './js/compose.js';
+import { composeSimple, composeWithAI, composeWithGemini } from './js/compose.js';
 import { generateImage } from './js/generate.js';
 import { fetchTweet, tweetIdOf, embedTweet } from './js/tweet.js';
 import { fetchTweetDetail, TWEET_URL_RE } from './js/tweet-api.js';
@@ -434,12 +434,16 @@ async function compose(useAI) {
   if (!state.scene || !ch) return;
   $('#refNote').hidden = !ch.images.length;
   $('#refImages').replaceChildren(...ch.images.map((src) => el('img', { src, alt: '参考画像' })));
-  $('#finalPrompt').value = useAI ? await composeWithAI(state.scene, ch, { apiKey: store.openaiKey }) : composeSimple(state.scene, ch);
+  $('#finalPrompt').value = !useAI
+    ? composeSimple(state.scene, ch)
+    : store.geminiKey
+      ? await composeWithGemini(state.scene, ch, { apiKey: store.geminiKey })
+      : await composeWithAI(state.scene, ch, { apiKey: store.openaiKey });
 }
 
 $('#aiCompose').onclick = (ev) =>
   busy(ev.target, async () => {
-    if (!store.openaiKey) throw new Error('設定タブで OpenAI APIキーを入れると使えます');
+    if (!store.geminiKey && !store.openaiKey) throw new Error('設定タブで Gemini APIキー(無料)を入れると使えます');
     if (!state.scene) throw new Error('先に②でシーンを選んでください');
     await compose(true);
     toast('AIで合成しました');
@@ -482,26 +486,33 @@ $('#generate').onclick = (ev) =>
   });
 
 // ---------- 設定 ----------
-$('#keyForm').onsubmit = (ev) => {
-  ev.preventDefault();
-  const key = ev.target.key.value.trim();
-  if (key) {
-    store.openaiKey = key;
+for (const form of document.querySelectorAll('.key-form')) {
+  const name = form.dataset.key;
+  form.onsubmit = (ev) => {
+    ev.preventDefault();
+    const key = form.key.value.trim();
+    if (key) {
+      store[name] = key;
+      saveQuiet();
+    }
+    form.reset();
+    renderKeyState();
+    toast('保存しました');
+  };
+  form.querySelector('.key-clear').onclick = () => {
+    store[name] = '';
     saveQuiet();
-  }
-  ev.target.reset();
-  renderKeyState();
-  toast('保存しました');
-};
-$('#keyClear').onclick = () => {
-  store.openaiKey = '';
-  saveQuiet();
-  renderKeyState();
-  toast('削除しました');
-};
+    renderKeyState();
+    toast('削除しました');
+  };
+}
 function renderKeyState() {
-  $('#keyForm').key.placeholder = store.openaiKey ? `保存済み(…${store.openaiKey.slice(-4)})` : 'sk-...';
+  for (const form of document.querySelectorAll('.key-form')) {
+    const key = store[form.dataset.key];
+    form.key.placeholder = key ? `保存済み(…${key.slice(-4)})` : form.dataset.placeholder;
+  }
   $('#genNote').hidden = !!store.openaiKey;
+  $('#aiCompose').textContent = store.geminiKey ? 'AIで自然に合成(Gemini)' : 'AIで自然に合成';
 }
 
 $('#exportBtn').onclick = () => {

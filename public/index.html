@@ -125,15 +125,25 @@
     </section>
     <!-- 設定 -->
     <section id="tab-settings" hidden>
-      <form id="keyForm" class="card">
-        <h2>OpenAI APIキー(任意)</h2>
-        <p class="muted">入れると「AIで自然に合成」と「生成」ボタンが使えます。キーはこのスマホのブラウザ内だけに保存され、OpenAI以外には送られません。API利用料は ChatGPT Plus とは別にかかります。</p>
+      <form class="card key-form" data-key="geminiKey" data-placeholder="AIza...">
+        <h2>Gemini APIキー(無料・おすすめ)</h2>
+        <p class="muted">入れると「AIで自然に合成」が無料で使えます。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> で Googleアカウントでログイン →「APIキーを作成」でコピーして貼ってください。無料枠は回数制限があり、送った内容が Google の改善に使われることがあります。</p>
+        <label>APIキー<input name="key" type="password" autocomplete="off" placeholder="AIza..."></label>
+        <div class="row">
+          <button type="submit" class="primary">保存</button>
+          <button type="button" class="key-clear">削除</button>
+        </div>
+      </form>
+      <form class="card key-form" data-key="openaiKey" data-placeholder="sk-...">
+        <h2>OpenAI APIキー(任意・有料)</h2>
+        <p class="muted">入れると「生成」ボタンでその場で画像生成できます(Gemini キーが無い時は「AIで自然に合成」にも使います)。API利用料は ChatGPT Plus とは別に、使った分だけかかります。</p>
         <label>APIキー<input name="key" type="password" autocomplete="off" placeholder="sk-..."></label>
         <div class="row">
           <button type="submit" class="primary">保存</button>
-          <button type="button" id="keyClear">削除</button>
+          <button type="button" class="key-clear">削除</button>
         </div>
       </form>
+      <p class="muted">キーはこのスマホのブラウザ内だけに保存され、Google / OpenAI 以外には送られません。</p>
       <div class="card">
         <h2>Xからの自動収集</h2>
         <p class="muted">GitHub Actions が毎朝6時ごろに X を検索して一覧を更新します。「Xから収集」ボタンを押すと今すぐ実行する画面(GitHub)が開くので、「Run workflow」を押してください。数分後に「最新を読み込む」で反映されます。<br>使うには GitHub の Settings → Secrets and variables → Actions に <code>X_BEARER_TOKEN</code> を登録してください(X API の有料プランが必要)。</p>

@@ -31,6 +31,8 @@ const SYSTEM = `あなたは画像生成AI(ChatGPT の画像生成)向けのプ�
 - 参考画像がある場合は「添付画像のキャラクターと同一人物として」と明記する
 - 出力はプロンプト本文のみ。前置きや説明は書かない`;
 
+const userMessage = (scene, ch) => `【シーン用プロンプト】\n${scene.text.trim()}\n\n【キャラクター設定】\n${characterBlock(ch)}`;
+
 export const TEXT_MODEL = 'gpt-5-mini';
 
 export async function composeWithAI(scene, ch, { apiKey, model = TEXT_MODEL }) {
@@ -41,10 +43,7 @@ export async function composeWithAI(scene, ch, { apiKey, model = TEXT_MODEL }) {
       model,
       messages: [
         { role: 'system', content: SYSTEM },
-        {
-          role: 'user',
-          content: `【シーン用プロンプト】\n${scene.text.trim()}\n\n【キャラクター設定】\n${characterBlock(ch)}`,
-        },
+        { role: 'user', content: userMessage(scene, ch) },
       ],
     }),
   });
@@ -53,4 +52,39 @@ export async function composeWithAI(scene, ch, { apiKey, model = TEXT_MODEL }) {
   const text = json.choices?.[0]?.message?.content?.trim();
   if (!text) throw new Error('OpenAI から空の応答が返りました');
   return text;
+}
+
+// Gemini(Google AI Studio の無料APIキーで使える)。安全フィルターは一番ゆるく設定。
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-2.5-flash'];
+const SAFETY_OFF = ['HARASSMENT', 'HATE_SPEECH', 'SEXUALLY_EXPLICIT', 'DANGEROUS_CONTENT'].map((c) => ({
+  category: `HARM_CATEGORY_${c}`,
+  threshold: 'BLOCK_NONE',
+}));
+
+export async function composeWithGemini(scene, ch, { apiKey }) {
+  let lastError;
+  for (const model of GEMINI_MODELS) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage(scene, ch) }] }],
+        safetySettings: SAFETY_OFF,
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 404) {
+      // モデル名が廃止されていたら次の候補へ
+      lastError = new Error(json.error?.message || `Gemini error ${res.status}`);
+      continue;
+    }
+    if (!res.ok) throw new Error(`Gemini: ${json.error?.message || res.status}`);
+    if (json.promptFeedback?.blockReason) throw new Error(`Gemini に断られました(${json.promptFeedback.blockReason})。シーンを少しマイルドにしてください`);
+    const cand = json.candidates?.[0];
+    const text = cand?.content?.parts?.map((p) => p.text || '').join('').trim();
+    if (!text) throw new Error(`Gemini に断られました(${cand?.finishReason || '空の応答'})。シーンを少しマイルドにしてください`);
+    return text;
+  }
+  throw lastError;
 }

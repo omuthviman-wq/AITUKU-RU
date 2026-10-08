@@ -3,7 +3,7 @@
 const DB = 'aituku-ru';
 const KEY = 'aituku-ru:v1'; // 旧バージョン(localStorage)のキー
 
-const empty = () => ({ chars: [], prompts: [], favs: [], hidden: [], edits: {}, currentChar: '', openaiKey: '' });
+const empty = () => ({ chars: [], prompts: [], favs: [], hidden: [], edits: {}, currentChar: '', openaiKey: '', geminiKey: '' });
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -57,12 +57,12 @@ export async function saveStore(s) {
 }
 
 export function exportStore(s) {
-  const { openaiKey, ...rest } = s; // キーはバックアップに含めない
+  const { openaiKey, geminiKey, ...rest } = s; // キーはバックアップに含めない
   return JSON.stringify(rest);
 }
 
 export function importStore(s, json) {
   const data = JSON.parse(json);
   if (!Array.isArray(data.chars)) throw new Error('バックアップ形式が違います');
-  return migrate({ ...empty(), ...data, openaiKey: s.openaiKey });
+  return migrate({ ...empty(), ...data, openaiKey: s.openaiKey, geminiKey: s.geminiKey });
 }
