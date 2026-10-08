@@ -1,6 +1,4 @@
-// X(Twitter) からプロンプトを集める。
-//  - X API v2 recent search(Bearer Token が必要)
-//  - ツイートURLを貼ると oEmbed で本文を取得(認証不要)
+// X API v2 recent search でプロンプトっぽいツイートを集める(GitHub Actions から実行)。
 
 export const DEFAULT_X_QUERY =
   '(ChatGPT OR GPT-4o OR gpt-image OR GPT画像) (プロンプト OR prompt) ' +
@@ -46,46 +44,9 @@ export async function searchX({ bearer, query, maxResults = 100 }) {
     .filter((p) => p.text.length >= 40);
 }
 
-export async function fetchTweetByUrl(url) {
-  const m = url.match(/(?:twitter\.com|x\.com)\/([^/]+)\/status\/(\d+)/);
-  if (!m) throw new Error('ツイートのURLではありません');
-  const res = await fetch(
-    `https://publish.twitter.com/oembed?omit_script=1&url=${encodeURIComponent(`https://twitter.com/${m[1]}/status/${m[2]}`)}`,
-  ).catch(netError('X'));
-  if (!res.ok) throw new Error(`ツイートを取得できませんでした (${res.status})。本文を直接貼り付けてください。`);
-  const json = await res.json();
-  const p = (json.html || '').match(/<p[^>]*>([\s\S]*?)<\/p>/);
-  const text = cleanTweetText(htmlToText(p ? p[1] : ''));
-  if (!text) throw new Error('本文が空でした。本文を直接貼り付けてください。');
-  return {
-    source: 'x',
-    externalId: m[2],
-    title: makeTitle(text),
-    text,
-    author: `@${m[1]}`,
-    url: `https://x.com/${m[1]}/status/${m[2]}`,
-    likes: 0,
-    score: 0,
-    tags: [],
-  };
-}
-
 const netError = (name) => (e) => {
   throw new Error(`${name} に接続できませんでした (${e.cause?.code || e.message})`);
 };
-
-function htmlToText(html) {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)));
-}
 
 function cleanTweetText(text) {
   return (text || '')

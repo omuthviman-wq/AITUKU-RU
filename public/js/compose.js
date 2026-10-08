@@ -4,7 +4,7 @@ export function characterBlock(ch) {
   const lines = [`名前: ${ch.name}`];
   if (ch.appearance) lines.push(`外見: ${ch.appearance}`);
   if (ch.extra) lines.push(`補足: ${ch.extra}`);
-  if (ch.hasImage) lines.push('添付の参考画像のキャラクターと同一人物として、顔立ち・髪型・髪色・体型を一致させてください。');
+  if (ch.image) lines.push('添付の参考画像のキャラクターと同一人物として、顔立ち・髪型・髪色・体型を一致させてください。');
   lines.push('※登場人物は成人(20代)として描写してください。');
   return lines.join('\n');
 }
@@ -31,7 +31,9 @@ const SYSTEM = `あなたは画像生成AI(ChatGPT の画像生成)向けのプ�
 - 参考画像がある場合は「添付画像のキャラクターと同一人物として」と明記する
 - 出力はプロンプト本文のみ。前置きや説明は書かない`;
 
-export async function composeWithAI(scene, ch, { apiKey, model }) {
+export const TEXT_MODEL = 'gpt-5-mini';
+
+export async function composeWithAI(scene, ch, { apiKey, model = TEXT_MODEL }) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },

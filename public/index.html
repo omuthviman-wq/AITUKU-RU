@@ -4,7 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AITUKU-RU</title>
-  <link rel="stylesheet" href="/style.css">
+  <meta name="theme-color" content="#e0457b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="AITUKU-RU">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header>
@@ -18,6 +25,7 @@
     <button data-tab="chars">① キャラ</button>
     <button data-tab="prompts" class="active">② プロンプト一覧</button>
     <button data-tab="make">③ 作る</button>
+    <button data-tab="settings">設定</button>
   </nav>
 
   <main>
@@ -26,7 +34,7 @@
       <form id="charForm" class="card">
         <h2 id="charFormTitle">キャラを登録</h2>
         <input type="hidden" name="id">
-        <label>名前<input name="name" required placeholder="例: ミナ"></label>
+        <label>名前<input name="name" placeholder="例: ミナ"></label>
         <label>見た目・キャラプロンプト
           <textarea name="appearance" rows="5" placeholder="例: 25歳の日本人女性、黒髪ロングのストレート、ぱっつん前髪、たれ目、泣きぼくろ、色白、スタイル抜群"></textarea>
         </label>
@@ -49,6 +57,7 @@
     <section id="tab-prompts">
       <div class="card toolbar">
         <button id="fetchX" class="primary">Xから収集</button>
+        <button id="reloadX">最新を読み込む</button>
         <input id="search" placeholder="絞り込み(水着、メイド…)">
         <select id="sourceFilter">
           <option value="">すべて</option>
@@ -109,9 +118,33 @@
         <div id="results" class="grid"></div>
       </div>
     </section>
+    <!-- 設定 -->
+    <section id="tab-settings" hidden>
+      <form id="keyForm" class="card">
+        <h2>OpenAI APIキー(任意)</h2>
+        <p class="muted">入れると「AIで自然に合成」と「生成」ボタンが使えます。キーはこのスマホのブラウザ内だけに保存され、OpenAI以外には送られません。API利用料は ChatGPT Plus とは別にかかります。</p>
+        <label>APIキー<input name="key" type="password" autocomplete="off" placeholder="sk-..."></label>
+        <div class="row">
+          <button type="submit" class="primary">保存</button>
+          <button type="button" id="keyClear">削除</button>
+        </div>
+      </form>
+      <div class="card">
+        <h2>Xからの自動収集</h2>
+        <p class="muted">GitHub Actions が毎朝6時ごろに X を検索して一覧を更新します。「Xから収集」ボタンを押すと今すぐ実行する画面(GitHub)が開くので、「Run workflow」を押してください。数分後に「最新を読み込む」で反映されます。<br>使うには GitHub の Settings → Secrets and variables → Actions に <code>X_BEARER_TOKEN</code> を登録してください(X API の有料プランが必要)。</p>
+      </div>
+      <div class="card">
+        <h2>バックアップ</h2>
+        <p class="muted">キャラや追加したプロンプトはこのブラウザにだけ保存されています。ブラウザのデータを消すと消えるので、たまにバックアップしてください(APIキーは含まれません)。</p>
+        <div class="row">
+          <button id="exportBtn">バックアップを保存</button>
+          <label class="button">復元<input type="file" id="importFile" accept="application/json" hidden></label>
+        </div>
+      </div>
+    </section>
   </main>
 
   <div id="toast" hidden></div>
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>

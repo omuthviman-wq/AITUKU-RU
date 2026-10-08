@@ -1,24 +1,27 @@
+import { SEED_PROMPTS } from './js/seeds.js';
+import { composeSimple, composeWithAI } from './js/compose.js';
+import { generateImage } from './js/generate.js';
+import { fetchTweet } from './js/tweet.js';
+import { loadStore, saveStore, exportStore, importStore } from './js/store.js';
+
 const $ = (s) => document.querySelector(s);
 
-const state = { config: {}, chars: [], prompts: [], scene: null };
+let store = loadStore();
+const state = { xPrompts: [], scene: null };
+const save = () => saveStore(store);
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
-async function api(method, url, body) {
-  const res = await fetch(url, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `エラー ${res.status}`);
-  return json;
-}
+// GitHub Pages の URL(user.github.io/repo/)から元リポジトリを割り出す
+const REPO_URL = location.hostname.endsWith('github.io')
+  ? `https://github.com/${location.hostname.split('.')[0]}/${location.pathname.split('/')[1]}`
+  : 'https://github.com/omuthviman-wq/AITUKU-RU';
 
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;
   t.hidden = false;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.hidden = true), 3000);
+  toast.timer = setTimeout(() => (t.hidden = true), 3500);
 }
 
 async function busy(btn, fn) {
@@ -47,43 +50,36 @@ function el(tag, attrs = {}, ...children) {
 function showTab(name) {
   for (const b of document.querySelectorAll('nav button')) b.classList.toggle('active', b.dataset.tab === name);
   for (const s of document.querySelectorAll('main > section')) s.hidden = s.id !== `tab-${name}`;
+  scrollTo(0, 0);
 }
 for (const b of document.querySelectorAll('nav button')) b.onclick = () => showTab(b.dataset.tab);
 
 // ---------- ① キャラ ----------
-const currentCharId = () => $('#currentChar').value;
-const currentChar = () => state.chars.find((c) => c.id === currentCharId());
-
-async function loadChars() {
-  state.chars = await api('GET', '/api/characters');
-  const sel = $('#currentChar');
-  const saved = localStorage.getItem('currentChar');
-  sel.replaceChildren(
-    ...(state.chars.length ? state.chars.map((c) => el('option', { value: c.id }, c.name)) : [el('option', { value: '' }, '未登録')]),
-  );
-  if (state.chars.some((c) => c.id === saved)) sel.value = saved;
-  renderChars();
-}
-$('#currentChar').onchange = () => {
-  localStorage.setItem('currentChar', currentCharId());
-  if (state.scene) compose(false);
-};
+const currentChar = () => store.chars.find((c) => c.id === store.currentChar);
 
 function renderChars() {
+  const sel = $('#currentChar');
+  sel.replaceChildren(
+    ...(store.chars.length ? store.chars.map((c) => el('option', { value: c.id }, c.name)) : [el('option', { value: '' }, '未登録')]),
+  );
+  if (!currentChar() && store.chars[0]) store.currentChar = store.chars[0].id;
+  sel.value = store.currentChar;
+
   $('#charList').replaceChildren(
-    ...state.chars.map((c) =>
+    ...store.chars.map((c) =>
       el('div', { class: 'card char' },
-        c.hasImage ? el('img', { src: `/images/${c.id}.png?v=${c.imageVersion || 0}`, alt: c.name }) : null,
+        c.image ? el('img', { src: c.image, alt: c.name }) : null,
         el('h2', {}, c.name),
         c.appearance ? el('p', {}, c.appearance) : null,
         c.extra ? el('p', { class: 'muted' }, c.extra) : null,
         el('div', { class: 'row' },
           el('button', { onclick: () => editChar(c) }, '編集'),
           el('button', {
-            onclick: async () => {
+            onclick: () => {
               if (!confirm(`${c.name} を削除しますか?`)) return;
-              await api('DELETE', `/api/characters/${c.id}`);
-              await loadChars();
+              store.chars = store.chars.filter((x) => x.id !== c.id);
+              save();
+              renderChars();
             },
           }, '削除'),
         ),
@@ -91,6 +87,11 @@ function renderChars() {
     ),
   );
 }
+$('#currentChar').onchange = (ev) => {
+  store.currentChar = ev.target.value;
+  save();
+  if (state.scene) compose(false);
+};
 
 function editChar(c) {
   const f = $('#charForm');
@@ -105,25 +106,29 @@ function editChar(c) {
 }
 
 function resetCharForm() {
-  $('#charForm').reset();
-  $('#charForm').id.value = '';
+  const f = $('#charForm');
+  f.reset();
+  f.id.value = '';
   $('#charFormTitle').textContent = 'キャラを登録';
   $('#charCancel').hidden = true;
 }
 $('#charCancel').onclick = resetCharForm;
 
-// 参考画像は1024px以内のPNGに変換してから送る
-function toPng(file) {
+// 参考画像は保存容量を食うので 768px 以内の JPEG に縮める
+function shrinkImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const scale = Math.min(1, 768 / Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * scale);
       c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/png'));
+      resolve(c.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = () => reject(new Error('画像を読み込めませんでした'));
     img.src = URL.createObjectURL(file);
@@ -134,42 +139,70 @@ $('#charForm').onsubmit = (ev) => {
   ev.preventDefault();
   const f = ev.target;
   busy(f.querySelector('button[type=submit]'), async () => {
-    const body = { name: f.name.value, appearance: f.appearance.value, extra: f.extra.value, adult: f.adult.checked };
-    const ch = f.id.value ? await api('PUT', `/api/characters/${f.id.value}`, body) : await api('POST', '/api/characters', body);
-    if (f.image.files[0]) await api('POST', `/api/characters/${ch.id}/image`, { dataUrl: await toPng(f.image.files[0]) });
-    localStorage.setItem('currentChar', ch.id);
+    const name = f.name.value.trim();
+    if (!name) throw new Error('名前は必須です');
+    if (!f.adult.checked) throw new Error('成人キャラのみ登録できます(「18歳以上」にチェック)');
+    const old = store.chars.find((c) => c.id === f.id.value);
+    const ch = {
+      id: old?.id || uid(),
+      name,
+      appearance: f.appearance.value.trim(),
+      extra: f.extra.value.trim(),
+      adult: true,
+      image: f.image.files[0] ? await shrinkImage(f.image.files[0]) : old?.image || '',
+    };
+    const prev = store.chars;
+    store.chars = old ? prev.map((c) => (c.id === ch.id ? ch : c)) : [...prev, ch];
+    store.currentChar = ch.id;
+    try {
+      save();
+    } catch (e) {
+      store.chars = prev;
+      throw e;
+    }
     resetCharForm();
-    await loadChars();
+    renderChars();
     toast(`${ch.name} を保存しました`);
   });
 };
 
 // ---------- ② プロンプト一覧 ----------
-async function loadPrompts() {
-  state.prompts = await api('GET', '/api/prompts');
-  renderPrompts();
+const SOURCE_LABEL = { x: 'X', manual: '手動', builtin: '内蔵' };
+
+function allPrompts() {
+  const seeds = SEED_PROMPTS.map((p, i) => ({ id: `builtin-${i}`, source: 'builtin', score: 0, likes: 0, ...p }));
+  const hidden = new Set(store.hidden);
+  const favs = new Set(store.favs);
+  return [...store.prompts, ...state.xPrompts, ...seeds]
+    .filter((p) => !hidden.has(p.id))
+    .map((p) => ({ ...p, fav: favs.has(p.id) }))
+    .sort((a, b) => b.fav - a.fav || (b.score || 0) - (a.score || 0));
 }
 
-const SOURCE_LABEL = { x: 'X', manual: '手動', builtin: '内蔵' };
+async function loadXPrompts() {
+  const res = await fetch(`data/prompts-x.json?t=${Date.now()}`);
+  state.xPrompts = res.ok ? await res.json() : [];
+}
 
 function renderPrompts() {
   const q = $('#search').value.trim().toLowerCase();
   const src = $('#sourceFilter').value;
-  const list = state.prompts.filter((p) => {
+  const list = allPrompts().filter((p) => {
     if (src === 'fav' ? !p.fav : src && p.source !== src) return false;
     return !q || `${p.title}\n${p.text}\n${(p.tags || []).join(' ')}`.toLowerCase().includes(q);
   });
   $('#promptList').replaceChildren(
-    ...(list.length ? list : []).map((p) => {
+    ...list.map((p) => {
       const card = el('div', { class: 'card prompt' },
         el('div', { class: 'row spread' },
           el('h2', {}, p.title),
           el('button', {
             class: `star ${p.fav ? 'on' : ''}`,
             title: 'お気に入り',
-            onclick: async () => {
-              await api('PUT', `/api/prompts/${p.id}`, { fav: !p.fav });
-              await loadPrompts();
+            onclick: () => {
+              store.favs = p.fav ? store.favs.filter((id) => id !== p.id) : [...store.favs, p.id];
+              save();
+              renderPrompts();
             },
           }, p.fav ? '★' : '☆'),
         ),
@@ -184,10 +217,12 @@ function renderPrompts() {
         el('div', { class: 'row' },
           el('button', { class: 'primary', onclick: () => pickScene(p) }, 'このキャラで作る'),
           el('button', {
-            onclick: async () => {
-              if (!confirm('この項目を削除しますか?')) return;
-              await api('DELETE', `/api/prompts/${p.id}`);
-              await loadPrompts();
+            onclick: () => {
+              if (!confirm('この項目を一覧から消しますか?')) return;
+              if (p.source === 'manual') store.prompts = store.prompts.filter((x) => x.id !== p.id);
+              else store.hidden = [...store.hidden, p.id];
+              save();
+              renderPrompts();
             },
           }, '削除'),
         ),
@@ -200,21 +235,37 @@ function renderPrompts() {
 $('#search').oninput = renderPrompts;
 $('#sourceFilter').onchange = renderPrompts;
 
-$('#fetchX').onclick = (ev) =>
+$('#fetchX').onclick = () => {
+  toast('GitHub で「Run workflow」を押すと収集が始まります。数分後に「最新を読み込む」を押してください');
+  window.open(`${REPO_URL}/actions/workflows/pages.yml`, '_blank', 'noopener');
+};
+$('#reloadX').onclick = (ev) =>
   busy(ev.target, async () => {
-    if (!state.config.hasX) throw new Error('.env に X_BEARER_TOKEN を設定すると自動収集できます。今はURL貼り付けで追加してください。');
-    const r = await api('POST', '/api/prompts/fetch-x');
-    await loadPrompts();
-    toast(`${r.total}件ヒット、新規 ${r.added}件を追加しました`);
+    await loadXPrompts();
+    renderPrompts();
+    toast(`Xのプロンプト ${state.xPrompts.length}件`);
   });
 
 $('#addForm').onsubmit = (ev) => {
   ev.preventDefault();
   const f = ev.target;
   busy(f.querySelector('button'), async () => {
-    await api('POST', '/api/prompts', { url: f.url.value.trim(), text: f.text.value.trim(), title: f.title.value.trim() });
+    const url = f.url.value.trim();
+    let text = f.text.value.trim();
+    let extra = { url };
+    if (url && !text) {
+      const t = await fetchTweet(url);
+      if (allPrompts().some((p) => p.externalId === t.externalId)) throw new Error('そのツイートは追加済みです');
+      text = t.text;
+      extra = t;
+    }
+    if (!text) throw new Error('本文かURLを入力してください');
+    const first = text.split('\n').map((s) => s.trim()).find(Boolean);
+    const title = f.title.value.trim() || (first.length > 30 ? `${first.slice(0, 30)}…` : first);
+    store.prompts = [{ id: uid(), source: 'manual', score: 0, likes: 0, tags: [], ...extra, text, title }, ...store.prompts];
+    save();
     f.reset();
-    await loadPrompts();
+    renderPrompts();
     toast('追加しました');
   });
 };
@@ -234,54 +285,103 @@ function pickScene(p) {
 async function compose(useAI) {
   const ch = currentChar();
   if (!state.scene || !ch) return;
-  $('#refNote').hidden = !ch.hasImage;
-  const { prompt } = await api('POST', '/api/compose', { promptId: state.scene.id, characterId: ch.id, useAI });
-  $('#finalPrompt').value = prompt;
+  $('#refNote').hidden = !ch.image;
+  $('#finalPrompt').value = useAI ? await composeWithAI(state.scene, ch, { apiKey: store.openaiKey }) : composeSimple(state.scene, ch);
 }
 
 $('#aiCompose').onclick = (ev) =>
   busy(ev.target, async () => {
+    if (!store.openaiKey) throw new Error('設定タブで OpenAI APIキーを入れると使えます');
     if (!state.scene) throw new Error('先に②でシーンを選んでください');
     await compose(true);
     toast('AIで合成しました');
   });
 
 async function copyPrompt() {
-  await navigator.clipboard.writeText($('#finalPrompt').value);
+  const ta = $('#finalPrompt');
+  try {
+    await navigator.clipboard.writeText(ta.value);
+  } catch {
+    ta.select();
+    document.execCommand('copy');
+  }
   toast('コピーしました');
 }
-$('#copyBtn').onclick = () => copyPrompt().catch((e) => toast(e.message));
+$('#copyBtn').onclick = copyPrompt;
 $('#openChatGPT').onclick = async () => {
   const text = $('#finalPrompt').value;
-  await copyPrompt().catch(() => {});
+  await copyPrompt();
   // ?q= で入力欄に流し込まれる(長すぎるとURLが切れるので、その時は貼り付けで)
-  const url = text.length < 1800 ? `https://chatgpt.com/?q=${encodeURIComponent(text)}` : 'https://chatgpt.com/';
-  window.open(url, '_blank', 'noopener');
+  location.href = text.length < 1800 ? `https://chatgpt.com/?q=${encodeURIComponent(text)}` : 'https://chatgpt.com/';
 };
 
 $('#generate').onclick = (ev) =>
   busy(ev.target, async () => {
-    if (!state.config.hasOpenAI) throw new Error('.env に OPENAI_API_KEY を設定するとワンボタン生成できます');
-    const prompt = $('#finalPrompt').value;
+    if (!store.openaiKey) throw new Error('設定タブで OpenAI APIキーを入れるとワンボタン生成できます');
+    const prompt = $('#finalPrompt').value.trim();
+    if (!prompt) throw new Error('プロンプトが空です');
     toast('生成中…(30秒〜1分ほどかかります)');
-    const { url } = await api('POST', '/api/generate', {
+    const ch = currentChar();
+    const src = await generateImage({
+      apiKey: store.openaiKey,
       prompt,
-      characterId: currentCharId(),
       size: $('#size').value,
       quality: $('#quality').value,
-      useRef: $('#useRef').checked,
+      refImage: $('#useRef').checked ? ch?.image : '',
     });
-    $('#results').prepend(
-      el('a', { href: url, target: '_blank', class: 'card' }, el('img', { src: url, alt: '生成結果' })),
-    );
+    $('#results').prepend(el('div', { class: 'card' }, el('img', { src, alt: '生成結果' }), el('p', { class: 'muted' }, '長押しで保存')));
     toast('できました');
   });
 
-// ---------- init ----------
-state.config = await api('GET', '/api/config');
-if (!state.config.hasOpenAI) {
-  $('#aiCompose').title = '.env に OPENAI_API_KEY が必要です';
-  $('#genCard').append(el('p', { class: 'muted' }, 'OPENAI_API_KEY 未設定のため、今はコピーしてChatGPTに貼る運用になります。'));
+// ---------- 設定 ----------
+$('#keyForm').onsubmit = (ev) => {
+  ev.preventDefault();
+  const key = ev.target.key.value.trim();
+  if (key) {
+    store.openaiKey = key;
+    save();
+  }
+  ev.target.reset();
+  renderKeyState();
+  toast('保存しました');
+};
+$('#keyClear').onclick = () => {
+  store.openaiKey = '';
+  save();
+  renderKeyState();
+  toast('削除しました');
+};
+function renderKeyState() {
+  $('#keyForm').key.placeholder = store.openaiKey ? `保存済み(…${store.openaiKey.slice(-4)})` : 'sk-...';
+  $('#genNote').hidden = !!store.openaiKey;
 }
-await Promise.all([loadChars(), loadPrompts()]);
-if (!state.chars.length) showTab('chars');
+
+$('#exportBtn').onclick = () => {
+  const a = el('a', {
+    href: URL.createObjectURL(new Blob([exportStore(store)], { type: 'application/json' })),
+    download: `aituku-ru-backup-${new Date().toISOString().slice(0, 10)}.json`,
+  });
+  a.click();
+};
+$('#importFile').onchange = async (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  try {
+    store = importStore(store, await file.text());
+    save();
+    renderChars();
+    renderPrompts();
+    toast('復元しました');
+  } catch (e) {
+    toast(e.message);
+  }
+  ev.target.value = '';
+};
+
+// ---------- init ----------
+$('#genCard').append(el('p', { class: 'muted', id: 'genNote' }, '設定タブで OpenAI APIキーを入れると、ここで直接生成できます。今はコピーしてChatGPTに貼ってください。'));
+renderKeyState();
+renderChars();
+await loadXPrompts().catch(() => {});
+renderPrompts();
+if (!store.chars.length) showTab('chars');

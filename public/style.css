@@ -23,7 +23,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 h1 { margin: 0; font-size: 20px; color: var(--accent); }
 h2 { margin: 0 0 8px; font-size: 16px; }
 nav { display: flex; gap: 4px; padding: 8px 16px 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
-nav button { border: none; border-bottom: 3px solid transparent; background: none; border-radius: 0; padding: 8px 12px; }
+nav button { border: none; border-bottom: 3px solid transparent; background: none; border-radius: 0; padding: 8px 6px; font-size: 14px; flex: 1; }
 nav button.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
 main { max-width: 900px; margin: 0 auto; padding: 16px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
@@ -55,3 +55,6 @@ button:disabled { opacity: .5; cursor: wait; }
 .star.on { color: #f5b301; }
 #results img { width: 100%; border-radius: 8px; }
 #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px; max-width: calc(100% - 32px); }
+label.button { display: inline-block; margin: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font-size: 15px; cursor: pointer; }
+code { font-size: 12px; }
+.row.spread h2 { flex: 1; min-width: 0; }
